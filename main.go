@@ -25,7 +25,9 @@ func main() {
 	var cFlag = flag.String("c", defConfFilePath, "config file path")
 	var iFlag = flag.String("i", "", "Remote IP Address")
 	var sFlag = flag.Int("s", -1, "Session ID to Query")
-	var mFlag = flag.String("m", "", "String to search in message")
+	var mFlag messageFlag
+	//var mFlag = flag.String("m", "", "String to search in message")
+	flag.Var(&mFlag, "m", "String to search in message. (can appear more than once)")
 	var oFlag = flag.String("o", "", "Output file")
 	var serverFlag = flag.Bool("server", false, "Only messages from the SMTPD (Server) Service")
 	var clientFlag = flag.Bool("client", false, "Only messages from the SMTPC (Client) Service")
@@ -117,17 +119,25 @@ func main() {
 		filtered = filterSourceIndex(filtered, s)
 	}
 
-	if len(*mFlag) != 0 {
-		filtered = filterMessageIndex(filtered, *mFlag)
+	// for _, m := range mFlag {
+	// 	filtered = filterMessageIndex(filtered, m)
+	// }
+
+	if len(mFlag) != 0 && !*sessionFlag {
+
 	}
 	//tc.start()
 	if *sessionFlag {
-		uniqueSIDs := getUniqueSessionIDs(filtered)
-		filtered = sessionIndex[uniqueSIDs[0]]
-		for i := 1; i < len(uniqueSIDs); i++ {
-			filtered = append(filtered, sessionIndex[uniqueSIDs[i]]...)
+		filtered = getAllSessionsRecords(sessionIndex, filtered)
+		for i := range mFlag {
+			//filtered = getAllSessionsRecords()
+			filtered = filterMessageIndex(filtered, mFlag[i:i+1])
+			filtered = getAllSessionsRecords(sessionIndex, filtered)
 		}
+	} else {
+		filtered = filterMessageIndex(filtered, mFlag)
 	}
+
 	//sessionT := tc.stop()
 	fmt.Fprint(out, "Filtered Count: ", len(filtered), "\r\n")
 
@@ -143,6 +153,15 @@ func main() {
 	//summaryT := tc.stop()
 	//fmt.Println("total time:", time.Now().Sub(st), "\nprint records: ", prT, "\nSession: ", sessionT, "\nScantime: ", scantimeT, "\n Dedup: ", getCommonT, "\nSummary: ", summaryT)
 	fmt.Println("Done")
+}
+
+func getAllSessionsRecords(sessionMap map[int][]int, recordIndices []int) []int {
+	uniqueSIDs := getUniqueSessionIDs(recordIndices)
+	result := make([]int, 0)
+	for _, sid := range uniqueSIDs {
+		result = append(result, sessionMap[sid]...)
+	}
+	return result
 }
 
 func printSummary(out *os.File, sessionIndex map[int][]int, ipIndex, hourIndex map[string][]int) {
@@ -308,12 +327,24 @@ func filterSourceIndex(a []int, s string) []int {
 	return r
 }
 
-func filterMessageIndex(a []int, m string) []int {
+func filterMessageIndex(a []int, m messageFlag) []int {
+	if m == nil {
+		return a
+	}
 	r := make([]int, 0)
 	for _, i := range a {
-		if strings.Contains(logRecords[i].message.text, m) {
+		matched := true
+		for _, j := range m {
+			if !strings.Contains(logRecords[i].message.text, j) {
+				matched = false
+				break
+			}
+
+		}
+		if matched {
 			r = append(r, i)
 		}
+
 	}
 	return r
 }
@@ -425,6 +456,17 @@ func (n *stringListSorter) getList() []string {
 		n.sort()
 	}
 	return n.l
+}
+
+type messageFlag []string
+
+func (m *messageFlag) String() string {
+	return strings.Join(*m, ",")
+}
+
+func (m *messageFlag) Set(s string) error {
+	*m = append(*m, s)
+	return nil
 }
 
 type config struct {
