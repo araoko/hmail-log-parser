@@ -20,6 +20,7 @@ import (
 func main() {
 	//tc := newTimeCounter()
 	//st := time.Now()
+	// test
 	var dFlag = flag.String("d", time.Now().Format("2006-01-02"), "log file date in format yyyy-MM-dd")
 	var cFlag = flag.String("c", defConfFilePath, "config file path")
 	var iFlag = flag.String("i", "", "Remote IP Address")
