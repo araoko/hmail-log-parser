@@ -25,6 +25,7 @@ func main() {
 	var cFlag = flag.String("c", defConfFilePath, "config file path")
 	var iFlag = flag.String("i", "", "Remote IP Address")
 	var sFlag = flag.Int("s", -1, "Session ID to Query")
+	var hFlag = flag.Int("h", -1, "the hour to Query (0-23")
 	var mFlag messageFlag
 	//var mFlag = flag.String("m", "", "String to search in message")
 	flag.Var(&mFlag, "m", "String to search in message. (can appear more than once)")
@@ -35,7 +36,7 @@ func main() {
 	var summaryFlag = flag.Bool("summary", false, "also print summary")
 
 	flag.Parse()
-	if !validageFlags(cFlag, dFlag, sFlag, sessionFlag, serverFlag, clientFlag) {
+	if !validageFlags(cFlag, dFlag, sFlag, hFlag, sessionFlag, serverFlag, clientFlag) {
 		log.Fatal("Flags Invalid")
 	}
 	out := os.Stdout
@@ -84,26 +85,16 @@ func main() {
 	if err = scanner.Err(); err != nil {
 		log.Fatal(err)
 	}
-	//tc.start()
-	var ipSlice []int
-	var sessionSlice []int
 
-	if *iFlag != "" {
-		var ok bool
-		if ipSlice, ok = ipIndex[*iFlag]; !ok {
-			ipSlice = make([]int, 0)
-		}
+	var hourIndexKey string
+	if *hFlag != -1 {
+		hourIndexKey = *dFlag + "_" + strconv.FormatInt(int64(*hFlag), 10)
 	}
+	hourSlice := getSliceFromMapString(hourIndex, hourIndexKey)
+	ipSlice := getSliceFromMapString(ipIndex, *iFlag)
+	sessionSlice := getSliceFromMapInt(sessionIndex, *sFlag)
 
-	if *sFlag != -1 {
-		var ok bool
-		if sessionSlice, ok = sessionIndex[*sFlag]; !ok {
-			sessionSlice = make([]int, 0)
-		}
-	}
-
-	filtered := getCommon(ipSlice, sessionSlice)
-	//getCommonT := tc.stop()
+	filtered := getCommon(hourSlice, ipSlice, sessionSlice)
 	if filtered == nil {
 		filtered = getAllIndices()
 	}
@@ -118,10 +109,6 @@ func main() {
 	if len(s) != 0 {
 		filtered = filterSourceIndex(filtered, s)
 	}
-
-	// for _, m := range mFlag {
-	// 	filtered = filterMessageIndex(filtered, m)
-	// }
 
 	if len(mFlag) != 0 && !*sessionFlag {
 
@@ -153,6 +140,33 @@ func main() {
 	//summaryT := tc.stop()
 	//fmt.Println("total time:", time.Now().Sub(st), "\nprint records: ", prT, "\nSession: ", sessionT, "\nScantime: ", scantimeT, "\n Dedup: ", getCommonT, "\nSummary: ", summaryT)
 	fmt.Println("Done")
+}
+
+func getSliceFromMapInt(m map[int][]int, k int) []int {
+	if k == -1 {
+		return nil
+	}
+	if r, ok := m[k]; ok {
+		return r
+	}
+	return make([]int, 0)
+}
+
+func convertFlag2HourIndexKey(f int, d string) string {
+	if f == -1 {
+		return ""
+	}
+	return d + "_" + strconv.FormatInt(int64(f), 10)
+}
+
+func getSliceFromMapString(m map[string][]int, k string) []int {
+	if k == "" {
+		return nil
+	}
+	if r, ok := m[k]; ok {
+		return r
+	}
+	return make([]int, 0)
 }
 
 func getAllSessionsRecords(sessionMap map[int][]int, recordIndices []int) []int {
@@ -191,13 +205,18 @@ func loadConfig(p string) config {
 	return c
 }
 
-func validageFlags(c *string, d *string, s *int, session *bool, server *bool, client *bool) bool {
+func validageFlags(c *string, d *string, s *int, h *int, session *bool, server *bool, client *bool) bool {
 	if *server && *client {
 		log.Println("Only one of the -server and -client parameters can be used")
 		return false
 	}
 	if *session && *s != -1 {
 		log.Println("Only one of the -s and -session flags can be used")
+		return false
+	}
+
+	if *h > 23 || *h < -1 {
+		log.Println("Ivalid value for -h: use a number between 0 and 23")
 		return false
 	}
 	_, err := time.Parse("2006-01-02", *d)
@@ -290,28 +309,45 @@ func updateSlice(v []int, i int) []int {
 	return append(v, i)
 }
 
-func getCommon(a []int, b []int) []int {
-	if a == nil && b == nil {
-		return nil
-	}
-	if a == nil {
-		return b
+func getCommon(a ...[]int) []int {
+	s := make([][]int, 0)
+
+	// take care of nil and empty slices first
+	for _, i := range a {
+		if i == nil {
+			continue
+		}
+		if len(i) == 0 {
+			return []int{}
+		}
+		s = append(s, i)
 	}
 
-	if b == nil {
-		return a
+	if len(s) == 1 {
+		return s[0]
 	}
-	if len(a) == 0 || len(b) == 0 {
-		return []int{}
+
+	r := s[0]
+
+	for slice := 1; slice < len(s); slice++ {
+		r = gc(r, s[slice])
+		if len(r) == 0 {
+			break
+		}
 	}
+	sort.Ints(r)
+	return r
+}
+
+func gc(a []int, b []int) []int {
 	m := make(map[int]struct{})
-	for _, k := range a {
-		m[k] = struct{}{}
+	for _, i := range a {
+		m[i] = struct{}{}
 	}
 	r := make([]int, 0)
-	for _, k := range b {
-		if _, ok := m[k]; ok {
-			r = append(r, k)
+	for _, j := range b {
+		if _, ok := m[j]; ok {
+			r = append(r, j)
 		}
 	}
 	return r

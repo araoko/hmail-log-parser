@@ -13,6 +13,9 @@
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/
 
+# VSCode debug file
+debug
+
 # folders for holding my log files used for testing
 bckup/
 data/

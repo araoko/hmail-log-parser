@@ -20,6 +20,9 @@ hmail-log-parser.exe [-d <logDate>]  -c <configFilePath> [-i <remoteIP>] [-s <se
 -s <sessionID>
     selects only log records with the specified session ID (integer). cannot be used with -session
 
+-h <hour>
+    selects only log records in the specified hour (0-23). it determins the hour by truncating the time. eg. 13:30:35.345 will be selected for hour 13
+
 -server
     when included, only records from the SMTP server (SMTPD) is selected. cannot be used with -client
 
@@ -39,12 +42,13 @@ hmail-log-parser.exe [-d <logDate>]  -c <configFilePath> [-i <remoteIP>] [-s <se
     outputs a summary of the log file parsed. these includes the number of records, the number of records for each remote ip, the number of records for each hour and the total number of sessions. this will be displaced in addition to the results of the filter parameters
 
 # Config File
-The config file is a json file used to specify the location of the log file. it contains two fields
+    The config file is a json file used to specify the location of the log file. it contains two fields
     "LogDir"
         the directory where the active log files are located. this is will the where hMailServer keeps its logs
     
     "LogRepoDir"
         the directory where log files are moved e.g. to free space on the drive the server writes it logs
+    Note: The config file is json so json escape characters apply, e.g you use double slash for windows path separator
     
 #Config file example
 
