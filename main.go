@@ -9,6 +9,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
+	"runtime/pprof"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,9 +20,11 @@ import (
 )
 
 func main() {
-	//tc := newTimeCounter()
-	//st := time.Now()
-	// test
+	////Profilevars begin
+	var cpuprofile = flag.String("cpuprofile", "", "write cpu profile `file`")
+	var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
+	////Profilevars end
+
 	var dFlag = flag.String("d", time.Now().Format("2006-01-02"), "log file date in format yyyy-MM-dd")
 	var cFlag = flag.String("c", defConfFilePath, "config file path")
 	var iFlag = flag.String("i", "", "Remote IP Address")
@@ -36,6 +40,20 @@ func main() {
 	var summaryFlag = flag.Bool("summary", false, "also print summary")
 
 	flag.Parse()
+	////Profile section1 begin
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal("could not create CPU profile: ", err)
+		}
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatal("could not start CPU profile: ", err)
+		}
+		defer pprof.StopCPUProfile()
+	}
+
+	////Profile section1 end
+
 	if !validageFlags(cFlag, dFlag, sFlag, hFlag, sessionFlag, serverFlag, clientFlag) {
 		log.Fatal("Flags Invalid")
 	}
@@ -140,6 +158,20 @@ func main() {
 	//summaryT := tc.stop()
 	//fmt.Println("total time:", time.Now().Sub(st), "\nprint records: ", prT, "\nSession: ", sessionT, "\nScantime: ", scantimeT, "\n Dedup: ", getCommonT, "\nSummary: ", summaryT)
 	fmt.Println("Done")
+
+	////Profile section2 begin
+	if *memprofile != "" {
+		f, err := os.Create(*memprofile)
+		if err != nil {
+			log.Fatal("could not create memory profile: ", err)
+		}
+		runtime.GC() // get up-to-date statistics
+		if err := pprof.WriteHeapProfile(f); err != nil {
+			log.Fatal("could not write memory profile: ", err)
+		}
+		f.Close()
+	}
+	////Profile section2 end
 }
 
 func getSliceFromMapInt(m map[int][]int, k int) []int {
@@ -321,6 +353,10 @@ func getCommon(a ...[]int) []int {
 			return []int{}
 		}
 		s = append(s, i)
+	}
+
+	if len(s) == 0{
+		return nil
 	}
 
 	if len(s) == 1 {
